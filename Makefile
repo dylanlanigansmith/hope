@@ -19,11 +19,11 @@ MAKE_FLAGS:=-j14
 SOURCES = $(wildcard src/**.cpp)
 OBJ = ${SOURCES:.cpp=.o}
 HEADERS = $(wildcard include/**.hpp)
-CFLAGS:=-std=c++17 -lGL
+CFLAGS:=-std=c++17 -lGL -Og
 
 
 EM_SHELLFILE:=src/shell.html
-EM_LDFLAGS:=-sUSE_WEBGL2=1  --shell-file $(EM_SHELLFILE)
+EM_LDFLAGS:=-sUSE_WEBGL2=1  --shell-file $(EM_SHELLFILE) 
 LDFLAGS=$(EM_LDFLAGS)
 
 INCLUDES:=-I$(SDL_INC)/ -I./include/ -I$(IMGUI_DIR)/
@@ -86,9 +86,9 @@ main: $(OBJ) imgui/imgui.o
 	$(CXX) $(CFLAGS) $(INCLUDES)  -c $< -o $@
 
 .PHONY: run
-run: clean all
+run: all
 	emrun $(OUT)
-#-sNO_FILESYSTEM=1 -sASSERTIONS=0 -sMALLOC=emmalloc --closure=1 
+
 
 
 

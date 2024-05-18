@@ -23,18 +23,63 @@ bool show_another_window = false;
 SDL_Texture *renderTexture = NULL;
 SDL_Surface* surf = NULL;
 
+
+
+
 #ifdef __EMSCRIPTEN__
 //https://emscripten.org/docs/api_reference/emscripten.h.html#calling-javascript-from-c-c
-    EM_JS(char*, js_get_user_agent,(),{
+EM_JS(char*, js_get_user_agent,(),{
 
-        //c str = utf 8 js str = utf 16 !!!
-        var useragent = window.navigator.userAgent;
-        console.log("get_user_agent()");
-        return stringToNewUTF8(useragent);
-        //window.navigator.userAgent
-    });
+    //c str = utf 8 js str = utf 16 !!!
+    var useragent = window.navigator.userAgent;
+    console.log("get_user_agent()");
+    return stringToNewUTF8(useragent);
+    //window.navigator.userAgent
+});
+
+  
+
+EM_BOOL touch_down_callback(int eventType, const EmscriptenTouchEvent *event, void *userData) {
+    ImGuiIO &io = ImGui::GetIO();  (void)io;
+
+    //so the good news:
+    //this works on chrome ios
+    //the bad news:
+    //we handle our touch BEFORE imgui / sdl does so io.WantTextInput wont get set until another touch
+    //could be worse some people actually add that behaviour intentionally
+
+
+     if(io.WantTextInput){
+        EM_ASM({
+            var el = document.getElementById("editor");
+            if(el  ) { //!(document.activeElement === el)
+               // el.style.display = "block";
+                el.focus();
+                //el.click();
+                //el.style.display = "none";
+            }
+        });
+     }
+     else{ 
+         EM_ASM({ 
+            //make a dummy button to close keyboard
+            const dummyInput = document.createElement('input');
+            dummyInput.setAttribute('type', 'button'); 
+            document.body.appendChild(dummyInput);
+            dummyInput.focus();
+            document.body.removeChild(dummyInput);
+        });
+     }
+
+    return 0;
+}
+
+
+EM_JS(int, is_mobile, (), {
+     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent); //good enough
+});
+
 #endif
-
 std::string get_user_agent(){
     char* ua = js_get_user_agent();
     auto ret = std::string(ua);
@@ -92,7 +137,8 @@ void mainloop(void) /* https://wiki.libsdl.org/SDL3/README/emscripten */
         exit(0);
 #endif
     }
-
+    ImGuiIO &io = ImGui::GetIO();  (void)io;
+       
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
@@ -102,6 +148,8 @@ void mainloop(void) /* https://wiki.libsdl.org/SDL3/README/emscripten */
         if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(window))
             shouldRun = false;
     }
+
+
 
     // Start the Dear ImGui frame
     ImGui_ImplSDLRenderer3_NewFrame();
@@ -117,19 +165,16 @@ void mainloop(void) /* https://wiki.libsdl.org/SDL3/README/emscripten */
         static float f = 0.0f;
         static int counter = 0;
 
-        ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+        ImGui::Begin("Emscripten"); // Create a window called "Hello, world!" and append into it.
+        static int mobile = is_mobile();
+        ImGui::Text("io.WantTextInput=%d mobile=%d", io.WantTextInput, mobile);          // Display some text (you can use a format strings too)
 
-        ImGui::Text("This is some useful text.");          // Display some text (you can use a format strings too)
         ImGui::Checkbox("Demo Window", &show_demo_window); // Edit bools storing our window open/close state
         ImGui::Checkbox("Another Window", &show_another_window);
 
         ImGui::SliderFloat("float", &f, 0.0f, 1.0f);             // Edit 1 float using a slider from 0.0f to 1.0f
         ImGui::ColorEdit3("clear color", (float *)&clear_color); // Edit 3 floats representing a color
 
-        if (ImGui::Button("Button"))
-        {
-            counter++;
-        }
 
         ImGui::SameLine();
         ImGui::Text("counter = %d", counter);
@@ -141,9 +186,23 @@ void mainloop(void) /* https://wiki.libsdl.org/SDL3/README/emscripten */
 
         ImGui::TextWrapped("UserAgent: %s", agent.c_str());
         
-        ImGuiIO &io = ImGui::GetIO();
-        (void)io;
+       
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+          static char text[1024 * 16] =
+                "/*\n"
+                " The Pentium F00F bug, shorthand for F0 0F C7 C8,\n"
+                " the hexadecimal encoding of one offending instruction,\n"
+                " more formally, the invalid operand with locked CMPXCHG8B\n"
+                " instruction bug, is a design flaw in the majority of\n"
+                " Intel Pentium, Pentium MMX, and Pentium OverDrive\n"
+                " processors (all in the P5 microarchitecture).\n"
+                "*/\n\n"
+                "label:\n"
+                "\tlock cmpxchg8b eax\n";
+
+            static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
+            ImGui::InputTextMultiline("##source", text, IM_ARRAYSIZE(text), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
+         
         ImGui::End();
     }
 
@@ -239,7 +298,12 @@ int main(int, char **)
 
     renderTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_W, SCREEN_H);
     SDL_assert(renderTexture != NULL);
-
+     emscripten_set_touchstart_callback(
+        EMSCRIPTEN_EVENT_TARGET_WINDOW,
+        NULL,
+        1,
+        touch_down_callback
+    );
 // Main loop
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(mainloop, 0, 1);

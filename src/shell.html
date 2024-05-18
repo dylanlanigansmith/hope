@@ -25,10 +25,18 @@
             image-rendering: pixelated;
             -ms-interpolation-mode: nearest-neighbor;
         }
+        
+        .hide {
+            display: none; 
+        }
+    
     </style>
   </head>
   <body>
+    <div contenteditable virtualkeyboardpolicy="manual" id="editor">
+ 
     <canvas class="game" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+   </div>
     <script type='text/javascript'>
       var Module = {
         preRun: [],
@@ -60,5 +68,6 @@
       };
     </script>
     {{{ SCRIPT }}}
+ 
   </body>
 </html>
