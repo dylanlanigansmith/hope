@@ -21,13 +21,33 @@ OBJ = ${SOURCES:.cpp=.o}
 HEADERS = $(wildcard include/**.hpp)
 CFLAGS:=-std=c++17 -lGL
 
-EM_SHELLFILE:=src/shell.html
-EM_LINKERFLAGS:=-sUSE_WEBGL2=1  --shell-file $(EM_SHELLFILE)
 
+EM_SHELLFILE:=src/shell.html
+EM_LDFLAGS:=-sUSE_WEBGL2=1  --shell-file $(EM_SHELLFILE)
+LDFLAGS=$(EM_LDFLAGS)
 
 INCLUDES:=-I$(SDL_INC)/ -I./include/ -I$(IMGUI_DIR)/
 LIBS:=-L$(SDL_DIR)/build -lSDL3
+
+
 OUTFILE:=main
+OUTDIR:=./build
+OUTEXT:=html
+
+OUT:=$(OUTDIR)/$(OUTFILE).$(OUTEXT)
+$(info Final Product: '$(OUT)')
+#Emscripten Preload
+#https://emscripten.org/docs/porting/files/packaging_files.html
+RESOURCE_DIR:=./resource
+
+USE_FILE_SYSTEM ?= 1
+ifeq ($(USE_FILE_SYSTEM), 0)
+LDFLAGS += -s NO_FILESYSTEM=1
+CFLAGS += -DIMGUI_DISABLE_FILE_FUNCTIONS
+endif
+ifeq ($(USE_FILE_SYSTEM), 1)
+LDFLAGS += --no-heap-copy --preload-file $(RESOURCE_DIR)@/
+endif
 
 #
 # Targets for Dependencies
@@ -59,7 +79,7 @@ main: $(OBJ) imgui/imgui.o
 	@echo $(OBJ)
 	@echo $(IM_OBJ)
 	@echo $(IM_SRC)
-	$(CXX) $(CFLAGS) $(EM_LINKERFLAGS) $(OBJ) $(LIBS) -o $(OUTFILE).html
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(OBJ) $(LIBS) -o $(OUT)
 
 %.o : %.cpp $(HEADERS)
 	@echo "[ $< ]"
@@ -67,7 +87,7 @@ main: $(OBJ) imgui/imgui.o
 
 .PHONY: run
 run: clean all
-	emrun $(OUTFILE).html
+	emrun $(OUT)
 #-sNO_FILESYSTEM=1 -sASSERTIONS=0 -sMALLOC=emmalloc --closure=1 
 
 
@@ -79,5 +99,5 @@ clean_deps:
 
 .PHONY: clean
 clean:
-	rm -rf $(OUTFILE).*
+	rm -rf $(OUTDIR)/$(OUTFILE).*
 	find ./src/ -type f -name '*.o' -delete
