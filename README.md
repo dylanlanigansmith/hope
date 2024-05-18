@@ -3,3 +3,6 @@
 Not sure what this will be yet but it is a good base
 
 WASM is cooler than I expected.
+
+
+[Latest Build]("/build/main.html")
