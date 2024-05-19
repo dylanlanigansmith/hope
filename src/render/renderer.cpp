@@ -1,10 +1,16 @@
-#include "renderer.hpp"
-#include "web.hpp"
+#include <common.hpp>
 #include <SDL3/SDL_video.h>
-
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
+
+#include "renderer.hpp"
+#include "web.hpp"
+
+#include "../geo.hpp"
+
+
+
 int Renderer::init(const char *title)
 {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMEPAD) != 0)
@@ -65,6 +71,9 @@ int Renderer::init(const char *title)
 
 
     LOGF("%s","init renderer!");
+
+    geo::load("/world/geojson-maps.kyd.au.geo.json");
+
     return 0;
 }
 
@@ -105,36 +114,49 @@ uint32_t HSVtoRGB(float h, float s, float v) {
 
     return (R << 24) | (G << 16) | (B << 8) | 0xFF; // Assuming RGBA format
 }
+
+float map_scale = 5.0f;
+
 void Renderer::render()
 {
+      //imgui impl of choice 
+    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
     render_overlay();
 
        // SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
     SDL_SetRenderDrawColor(renderer, 0,0,0,255);
-
-    SDL_LockTextureToSurface(text, NULL, &surf);
-    int x,y;
-    float hue = 0.0f;
-    float hueIncrement = 1.0f / SCREEN_W; 
-    for(y = 0; y < SCREEN_H; ++y)
-        for(x = 0; x < SCREEN_W; ++x){
-            
-            int index = (y * surf->pitch / 4) + x;
-            ((uint32_t*)surf->pixels  )[index] = HSVtoRGB(hue, 1.0f, 1.0f);
-                hue += hueIncrement;
-            if (hue > 1.0f) {
-                hue -= 1.0f;
+    if(0)
+    {
+        SDL_LockTextureToSurface(text, NULL, &surf);
+        int x,y;
+        float hue = 0.0f;
+        float hueIncrement = 1.0f / SCREEN_W; 
+        for(y = 0; y < SCREEN_H; ++y)
+            for(x = 0; x < SCREEN_W; ++x){
+                
+                int index = (y * surf->pitch / 4) + x;
+                ((uint32_t*)surf->pixels  )[index] = HSVtoRGB(hue, 1.0f, 1.0f);
+                    hue += hueIncrement;
+                if (hue > 1.0f) {
+                    hue -= 1.0f;
+                }
             }
-        }
+        x = SCREEN_W - 1; y = SCREEN_H - 1;
+        int index = (y * surf->pitch / 4) + x;
+        ((uint32_t*)surf->pixels  )[index] = 0xFF0000FF;
+        SDL_UnlockTexture(text);
+    
 
+        SDL_RenderTexture(renderer, text, NULL, NULL);
+    }
+  
 
-    x = SCREEN_W - 1; y = SCREEN_H - 1;
-    int index = (y * surf->pitch / 4) + x;
-    ((uint32_t*)surf->pixels  )[index] = 0xFF0000FF;
-    SDL_UnlockTexture(text);
-   
-
-    SDL_RenderTexture(renderer, text, NULL, NULL);
+    SDL_RenderClear(renderer);
+    //https://github.com/pedro-vicente/render_geojson/blob/master/render_geojson.cc
+    geo::render(renderer, map_scale);
+    ImGui::Render();
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
     SDL_RenderPresent(renderer);
 }
@@ -142,7 +164,7 @@ void Renderer::render()
 void Renderer::deduceScreenSize()
 {
 
-    SDL_GetWindowSize(window, &w, &h);
+    SDL_GetWindowSize(window, &w, &h); //terribly hard deduction
     LOGF("deduced screen size of %i x %i", w, h);
 }
 
@@ -150,30 +172,26 @@ void Renderer::render_overlay() //gui
 {
 
 
-      // Start the Dear ImGui frame
-    ImGui_ImplSDLRenderer3_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
     
      ImGuiIO &io = ImGui::GetIO();  (void)io;
-    ImGui::NewFrame();
-    static bool show_demo_window = true;
+    
+    static bool show_demo_window = false;
     // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
     if (show_demo_window)
         ImGui::ShowDemoWindow(&show_demo_window);
 
     // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
     {
-        static float f = 0.0f;
-        static int counter = 0;
+        
 
-        ImGui::Begin("Emscripten"); // Create a window called "Hello, world!" and append into it.
+        ImGui::Begin("Map"); // Create a window called "Hello, world!" and append into it.
         static int mobile = 0; //is_mobile();
         ImGui::Text("io.WantTextInput=%d mobile=%d", io.WantTextInput, mobile);          // Display some text (you can use a format strings too)
-
-        ImGui::Checkbox("Demo Window", &show_demo_window); // Edit bools storing our window open/close state
+        ImGui::SameLine();
+        ImGui::Checkbox("Demo", &show_demo_window); // Edit bools storing our window open/close state
        
 
-        
+        ImGui::SliderFloat("Map Scale", &map_scale, 0, 50);
         static std::string agent = "dunno";
         if(ImGui::Button("Get UserAgent")){
            
@@ -183,22 +201,24 @@ void Renderer::render_overlay() //gui
 
         ImGui::TextWrapped("UserAgent: %s", agent.c_str());
         
-       
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-          static char text[1024 * 16] =
-                "/*\n"
-                " The Pentium F00F bug, shorthand for F0 0F C7 C8,\n"
-                " the hexadecimal encoding of one offending instruction,\n"
-                " more formally, the invalid operand with locked CMPXCHG8B\n"
-                " instruction bug, is a design flaw in the majority of\n"
-                " Intel Pentium, Pentium MMX, and Pentium OverDrive\n"
-                " processors (all in the P5 microarchitecture).\n"
-                "*/\n\n"
-                "label:\n"
-                "\tlock cmpxchg8b eax\n";
+        if(ImGui::CollapsingHeader("Text Input Test")){
+             static char text[1024 * 16] =
+                "\n"
+                " test text can you type on mobile!\n"
+                " you can type and edit this\n"
+                " crazy huh\n";
+               
 
             static ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput;
             ImGui::InputTextMultiline("##source", text, IM_ARRAYSIZE(text), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
+        }
+       
+        
+         
+
+
+            
          
         ImGui::End();
     }
@@ -206,7 +226,7 @@ void Renderer::render_overlay() //gui
 
 
     // Rendering
-    ImGui::Render();
+   
 
     //ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 }

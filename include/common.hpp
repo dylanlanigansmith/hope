@@ -11,6 +11,10 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <cstdio>
+#include <vector>
+#include <unordered_map>
+#include <functional>
+#include <algorithm>
 
 //may as well
 #include <SDL3/SDL.h>

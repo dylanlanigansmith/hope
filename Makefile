@@ -15,6 +15,10 @@ GLM_BUILDDIR:=$(GLM_DIR)/build
 GLM_LIB:=$(GLM_BUILDDIR)/glm/libglm.a
 
 
+GJSON_DIR:=./lib/lib_geojson
+GJSON_INC:=-I$(GJSON_DIR)/gason/src/ -I$(GJSON_DIR)/
+GJSON_LIB:=$(GJSON_DIR)
+GJSON_BUILDDIR:=$(GJSON_DIR)
 
 CCMAKE:=emcmake cmake 
 
@@ -32,7 +36,7 @@ EM_SHELLFILE:=src/shell.html
 EM_LDFLAGS:=-sUSE_WEBGL2=1  --shell-file $(EM_SHELLFILE) 
 LDFLAGS=$(EM_LDFLAGS)
 
-INCLUDES:=-I$(SDL_INC)/ -I./include/ -I$(IMGUI_DIR)/ -I$(GLM_INC)/
+INCLUDES:=-I$(SDL_INC)/ -I./include/ -I$(IMGUI_DIR)/ -I$(GLM_INC)/ $(GJSON_INC)
 LIBS:=-L$(SDL_DIR)/build -lSDL3 -L$(GLM_BUILDDIR)/glm -lglm 
 
 
@@ -79,17 +83,39 @@ $(GLM_LIB):
 	$(MAKE) -C $(GLM_BUILDDIR) $(MAKE_FLAGS) all
 
 
+
+
+GJSON_SRCS=$(GJSON_DIR)/geojson.cc $(GJSON_DIR)/gason/src/gason.cpp
+
+
+GJSON_OBJ:=$(GJSON_DIR)/geojson.o $(GJSON_DIR)/gason.o
+OBJ += $(GJSON_OBJ)
+
+.PHONY: lib_geojson
+lib_geojson:
+	$(CXX) -c $(CFLAGS) $(GJSON_INC) $(GJSON_SRCS) 
+#still greasy
+	mv *.o $(GJSON_DIR)/ 
+
+
+#include_directories(gason/src)
+#set(sources ${sources})
+#set(sources ${sources} geojson.hh)
+#set(sources ${sources} geojson.cc)
+#set(sources ${sources} gason/src/gason.h)
+#set(sources ${sources} gason/src/gason.cpp)
+
 #Main Targets
 
 
 .PHONY: all
 all: clean main
 
-main: $(OBJ) imgui/imgui.o $(GLM_LIB)
+main: $(OBJ) imgui/imgui.o $(GLM_LIB) lib_geojson
 	@echo $(OBJ)
 	@echo $(IM_OBJ)
 	@echo $(IM_SRC)
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(OBJ) $(LIBS) -o $(OUT)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -sALLOW_MEMORY_GROWTH=1 $(OBJ) $(LIBS) -o $(OUT)
 
 %.o : %.cpp $(HEADERS)
 	@echo $(OBJ)
