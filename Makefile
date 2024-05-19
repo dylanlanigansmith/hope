@@ -1,3 +1,5 @@
+#emmake make [...]
+
 
 #locations of deps etc
 SDL_DIR:=./SDL
@@ -7,6 +9,10 @@ SDL_INC:=$(SDL_DIR)/include
 
 IMGUI_DIR:=./imgui
 
+GLM_DIR:=./glm
+GLM_INC:=$(GLM_DIR)
+GLM_BUILDDIR:=$(GLM_DIR)/build
+GLM_LIB:=$(GLM_BUILDDIR)/glm/libglm.a
 
 
 
@@ -16,18 +22,18 @@ MAKE:=emmake make
 MAKE_FLAGS:=-j14
 
 
-SOURCES = $(wildcard src/**.cpp)
+SOURCES = $(wildcard src/**.cpp src/**/**.cpp)
 OBJ = ${SOURCES:.cpp=.o}
 HEADERS = $(wildcard include/**.hpp)
-CFLAGS:=-std=c++17 -lGL -Og
+CFLAGS:=-std=c++17 -Og
 
 
 EM_SHELLFILE:=src/shell.html
 EM_LDFLAGS:=-sUSE_WEBGL2=1  --shell-file $(EM_SHELLFILE) 
 LDFLAGS=$(EM_LDFLAGS)
 
-INCLUDES:=-I$(SDL_INC)/ -I./include/ -I$(IMGUI_DIR)/
-LIBS:=-L$(SDL_DIR)/build -lSDL3
+INCLUDES:=-I$(SDL_INC)/ -I./include/ -I$(IMGUI_DIR)/ -I$(GLM_INC)/
+LIBS:=-L$(SDL_DIR)/build -lSDL3 -L$(GLM_BUILDDIR)/glm -lglm 
 
 
 OUTFILE:=main
@@ -68,6 +74,10 @@ imgui/imgui.o: $(SDL_LIB)
 	mv imgui.o imgui/
 
 
+$(GLM_LIB):
+	$(CCMAKE) -S $(GLM_DIR) -B $(GLM_BUILDDIR)
+	$(MAKE) -C $(GLM_BUILDDIR) $(MAKE_FLAGS) all
+
 
 #Main Targets
 
@@ -75,13 +85,14 @@ imgui/imgui.o: $(SDL_LIB)
 .PHONY: all
 all: clean main
 
-main: $(OBJ) imgui/imgui.o
+main: $(OBJ) imgui/imgui.o $(GLM_LIB)
 	@echo $(OBJ)
 	@echo $(IM_OBJ)
 	@echo $(IM_SRC)
 	$(CXX) $(CFLAGS) $(LDFLAGS) $(OBJ) $(LIBS) -o $(OUT)
 
 %.o : %.cpp $(HEADERS)
+	@echo $(OBJ)
 	@echo "[ $< ]"
 	$(CXX) $(CFLAGS) $(INCLUDES)  -c $< -o $@
 

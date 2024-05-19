@@ -12,7 +12,11 @@
 #include <cstdlib>
 #include <cstdio>
 
+//may as well
+#include <SDL3/SDL.h>
 
+
+#include "log.hpp"
 
 #define SCREEN_W 1280
 #define SCREEN_H 720
