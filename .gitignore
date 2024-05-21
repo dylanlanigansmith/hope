@@ -1,3 +1,4 @@
 *.o
 *.a
 *.so
+map_data/**

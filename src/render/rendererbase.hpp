@@ -1,6 +1,6 @@
 #pragma once
 #include <common.hpp>
-
+#include "renderertypes.hpp"
 class RendererBase
 {
 public:
@@ -11,7 +11,7 @@ public:
     virtual void cleanup() = 0;
     virtual void render() = 0;
 
-
+  
 
     inline auto width() { return w; }
     inline auto height() { return h; }

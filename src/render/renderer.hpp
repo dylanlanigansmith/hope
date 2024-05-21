@@ -1,6 +1,7 @@
 #pragma once
 #include "rendererbase.hpp"
 
+
 class Renderer : public RendererBase {
 public:
     Renderer() : renderer(0), text(0), surf(0)  {}
@@ -13,7 +14,7 @@ public:
 
     inline auto& get() { return renderer; }
 
-
+    inline auto& get_text() { return text; } //DELETE THIS IS TEMP TEST
 protected:
 
     void deduceScreenSize();

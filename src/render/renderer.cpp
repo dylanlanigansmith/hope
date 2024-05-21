@@ -9,7 +9,14 @@
 
 #include "../geo.hpp"
 
+#include "GL/gl.h"
+#include "globe.hpp"
 
+#include "glm/glm.hpp"
+
+
+geojson_t worldmap;
+geojson_t worldwater;
 
 int Renderer::init(const char *title)
 {
@@ -65,15 +72,17 @@ int Renderer::init(const char *title)
     ImFont *font = io.Fonts->AddFontFromFileTTF("fonts/Roboto-Medium.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
     IM_ASSERT(font != nullptr);
 
-    text = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_W, SCREEN_H);
+    text = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, SCREEN_W, SCREEN_H);
     SDL_assert(text != NULL);
 
 
 
     LOGF("%s","init renderer!");
 
-    geo::load("/world/geojson-maps.kyd.au.geo.json");
+ 
 
+    geo::load(worldmap, "/world/geojson-maps.kyd.au.geo.json");
+    geo::load(worldwater, "/world/cities.geojson");
     return 0;
 }
 
@@ -90,72 +99,66 @@ void Renderer::cleanup()
 }
 
 
-uint32_t HSVtoRGB(float h, float s, float v) {
-    float r, g, b;
 
-    int i = static_cast<int>(h * 6);
-    float f = h * 6 - i;
-    float p = v * (1 - s);
-    float q = v * (1 - f * s);
-    float t = v * (1 - (1 - f) * s);
-
-    switch (i % 6) {
-    case 0: r = v, g = t, b = p; break;
-    case 1: r = q, g = v, b = p; break;
-    case 2: r = p, g = v, b = t; break;
-    case 3: r = p, g = q, b = v; break;
-    case 4: r = t, g = p, b = v; break;
-    case 5: r = v, g = p, b = q; break;
-    }
-
-    uint8_t R = static_cast<uint8_t>(r * 255);
-    uint8_t G = static_cast<uint8_t>(g * 255);
-    uint8_t B = static_cast<uint8_t>(b * 255);
-
-    return (R << 24) | (G << 16) | (B << 8) | 0xFF; // Assuming RGBA format
-}
 
 float map_scale = 5.0f;
+struct Vertex {
+    glm::vec3 position;
+    glm::vec3 normal;
+    glm::vec2 texCoord;
+};
+
+
 
 void Renderer::render()
 {
+
+    static Globe globe(w,h);
       //imgui impl of choice 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
     render_overlay();
 
-       // SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-    SDL_SetRenderDrawColor(renderer, 0,0,0,255);
-    if(0)
-    {
-        SDL_LockTextureToSurface(text, NULL, &surf);
-        int x,y;
-        float hue = 0.0f;
-        float hueIncrement = 1.0f / SCREEN_W; 
-        for(y = 0; y < SCREEN_H; ++y)
-            for(x = 0; x < SCREEN_W; ++x){
-                
-                int index = (y * surf->pitch / 4) + x;
-                ((uint32_t*)surf->pixels  )[index] = HSVtoRGB(hue, 1.0f, 1.0f);
-                    hue += hueIncrement;
-                if (hue > 1.0f) {
-                    hue -= 1.0f;
-                }
-            }
-        x = SCREEN_W - 1; y = SCREEN_H - 1;
-        int index = (y * surf->pitch / 4) + x;
-        ((uint32_t*)surf->pixels  )[index] = 0xFF0000FF;
-        SDL_UnlockTexture(text);
-    
+    bool doin_earth_thing = false;
 
-        SDL_RenderTexture(renderer, text, NULL, NULL);
+       // SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+    
+    if (doin_earth_thing)
+    {
+        if (SDL_SetRenderTarget(renderer, text) != 0)
+        {
+            LOGF("wtf %s", SDL_GetError());
+        }
+
+        SDL_SetRenderDrawColor(renderer, 0, 235, 255, 255);
+        SDL_RenderClear(renderer);
+        geo::render(worldmap, renderer, map_scale);
+        SDL_SetRenderTarget(renderer, 0);
+
+        globe.Draw(this);
     }
+    else{
+        SDL_SetRenderDrawColor(renderer, 0,0,10,255);
+        SDL_RenderClear(renderer);
+        geo::render(worldmap, renderer, map_scale);
+
+    //    SDL_SetRenderDrawColor(renderer, 0,255,255,255);
+geo::render(worldwater, renderer, map_scale);
+        
+    }
+    
+    
   
 
-    SDL_RenderClear(renderer);
+    
     //https://github.com/pedro-vicente/render_geojson/blob/master/render_geojson.cc
-    geo::render(renderer, map_scale);
+    
+    
+  
+  
+    
+
     ImGui::Render();
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
     SDL_RenderPresent(renderer);

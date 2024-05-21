@@ -8,15 +8,82 @@
 namespace geo
 {
 
-static inline geojson_t& geojson(){
-    static  geojson_t _gj;
 
-    return _gj;
+static int loadgeo(geojson_t& gj, const char* filename){
+   
+ 
+
+    if(gj.convert(filename) != 0){
+        ERRORF("failed loading GeoJSON file %s", filename);
+        return 1;
+    }
+    //this worked first try
+    //so damn
+    LOGF("loaded GeoJSON %s size = %li", filename, gj.m_feature.size());
+    
+    
+
+    //stolen, gets bounds 
+    double x_low, y_low, x_high, y_high; //data
+    x_high = x_low = y_high = y_low = 0.00; 
+
+     size_t size_features = gj.m_feature.size();
+  for (size_t idx_fet = 0; idx_fet < size_features; idx_fet++)
+  {
+    feature_t feature = gj.m_feature.at(idx_fet);
+    size_t size_geometry = feature.m_geometry.size();
+    for (size_t idx_geo = 0; idx_geo < size_geometry; idx_geo++)
+    {
+      geometry_t geometry = feature.m_geometry.at(idx_geo);
+      size_t size_pol = geometry.m_polygons.size();
+      for (size_t idx_pol = 0; idx_pol < size_pol; idx_pol++)
+      {
+        polygon_t polygon = geometry.m_polygons[idx_pol];
+        size_t size_crd = polygon.m_coord.size();
+        if (size_crd == 0)
+        {
+          continue;
+        }
+        std::vector<double> lat;
+        std::vector<double> lon;
+        for (size_t idx = 0; idx < size_crd; idx++)
+        {
+          lat.push_back(polygon.m_coord[idx].y);
+          lon.push_back(polygon.m_coord[idx].x);
+        }
+        for (size_t idx = 0; idx < size_crd; idx++)
+        {
+          double lat_ = lat.at(idx);
+          double lon_ = lon.at(idx);
+          if (lat_ > y_high)
+          {
+            y_high = lat.at(idx);
+          }
+          if (lon_ > x_high)
+          {
+            x_high = lon.at(idx);
+          }
+          if (lat_ < y_low)
+          {
+            y_low = lat.at(idx);
+          }
+          if (lon_ < x_low)
+          {
+            x_low = lon.at(idx);
+          }
+        }
+      }  //idx_pol
+    } //idx_geo
+  } //idx_fet
+
+  LOGF("x_low=%f x_high=%f y_low=%f y_high=%f", x_low, x_high, y_low, y_high);
+    return 0;
 }
 
-static int load(const char* filename){
+
+static int load(geojson_t& gj, const char* filename){
    
-    auto& gj = geojson();
+ 
 
     if(gj.convert(filename) != 0){
         ERRORF("failed loading GeoJSON file %s", filename);
@@ -92,8 +159,8 @@ struct geo_poly_t
     std::string name;
 };
 
-static void render(SDL_Renderer* render, double scale = 1.0){
-    auto& gj = geojson();
+static void render(geojson_t& gj, SDL_Renderer* render, double scale = 1.0){
+    
 
     if(gj.m_feature.empty()) return;
 
@@ -111,11 +178,11 @@ static void render(SDL_Renderer* render, double scale = 1.0){
     }   
     last_scale = scale;
     ImGuiIO &io = ImGui::GetIO();  (void)io;
-    ImGui::Begin("Geo");
+    ImGui::Begin(gj.m_feature.front().m_name.c_str());
 
-    static float x_off, y_off;
-    ImGui::SliderFloat("XOff", &x_off, -15000, 15000);
-    ImGui::SliderFloat("YOff", &y_off, -15000, 15000);
+    static float x_off =  0.f, y_off = 0.f; // -2750.f, y_off = -677.f;
+    ImGui::SliderFloat("XOff", &x_off, -5000, 5000);
+    ImGui::SliderFloat("YOff", &y_off, -5000, 5000);
     bool dragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
     static bool last_drag = dragging;
 
@@ -139,19 +206,20 @@ static void render(SDL_Renderer* render, double scale = 1.0){
         for (size_t idx_fet = 0; idx_fet < size_features; idx_fet++)
         {
             feature_t feature = gj.m_feature.at(idx_fet);
-            LOGF("doin %s", feature.m_name.c_str());
+            
             auto& gp = geo[feature.m_name];
              gp.name = feature.m_name;
                          gp.clr = { (uint8_t)(int)(emscripten_random() * 255), (uint8_t)(int)(emscripten_random() * 255), (uint8_t)(int)(emscripten_random() * 255), 255 };
             size_t size_geometry = feature.m_geometry.size();
 
-          //  if (feature.m_name == "Canada")
-           // { // dont fw that place
-          //      continue;
-          //  }
+           
+           
+        //    LOGF("doin %s", feature.m_name.c_str());
+           
             for (size_t idx_geo = 0; idx_geo < size_geometry; idx_geo++)
             {
                 geometry_t geometry = feature.m_geometry.at(idx_geo);
+             
                 size_t size_pol = geometry.m_polygons.size();
                 for (size_t idx_pol = 0; idx_pol < size_pol; idx_pol++)
                 {
@@ -206,11 +274,36 @@ static void render(SDL_Renderer* render, double scale = 1.0){
     }
     
     for(auto& entry : geo){
-        if(entry.first == "Canada" || entry.first=="France") continue;
+      //  if(entry.first != "Canada" ) continue;
         auto& gp = entry.second;
-         SDL_SetRenderDrawColor(render, gp.clr.r, gp.clr.g,gp.clr.b, gp.clr.a);
-         SDL_RenderPoints(render, gp.p.data(), gp.p.size());
+         SDL_SetRenderDrawColor(render, gp.clr.r, gp.clr.g,gp.clr.b, 255);
+        // SDL_RenderLines(render, gp.p.data(), gp.p.size());
+         // SDL_SetRenderDrawColor(render, 255,255,255,255);
+          SDL_RenderPoints(render, gp.p.data(), gp.p.size());
+
+         
+          
     }
+    /*
+      for(auto& entry : geo){
+          std::vector<SDL_Vertex> vert;
+           auto& gp = entry.second;
+          for(auto& p : entry.second.p){
+            SDL_Vertex v;
+            v.position = {p.x, p.y};
+            v.color = {gp.clr.r / 255.f, gp.clr.g / 255.f,gp.clr.b / 255.f, 1.f};
+            vert.push_back(v);
+          }
+          if(vert.size() % 3){
+            //ahh
+            continue;
+          }
+          int indices[] = {0,1,2};
+          SDL_RenderGeometry(render,0,vert.data(), vert.size(),0,vert.size());
+
+      }*/
+
+
     ImGui::End();
    //  SDL_RenderPoints(render, points.data(), points.size());
 
