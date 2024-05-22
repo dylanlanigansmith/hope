@@ -26,3 +26,5 @@
 #define SCREEN_H 720
 
 
+extern float add_to_mapscale;
+extern std::string event_str;

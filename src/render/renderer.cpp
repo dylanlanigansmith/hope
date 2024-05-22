@@ -112,7 +112,9 @@ struct Vertex {
 
 void Renderer::render()
 {
+    //https://datatracker.ietf.org/doc/html/rfc7946#section-3.1.6
 
+    //write own better geojson library
     static Globe globe(w,h);
       //imgui impl of choice 
     ImGui_ImplSDLRenderer3_NewFrame();
@@ -133,7 +135,7 @@ void Renderer::render()
 
         SDL_SetRenderDrawColor(renderer, 0, 235, 255, 255);
         SDL_RenderClear(renderer);
-        geo::render(worldmap, renderer, map_scale);
+        geo::render(worldmap, renderer);
         SDL_SetRenderTarget(renderer, 0);
 
         globe.Draw(this);
@@ -141,10 +143,10 @@ void Renderer::render()
     else{
         SDL_SetRenderDrawColor(renderer, 0,0,10,255);
         SDL_RenderClear(renderer);
-        geo::render(worldmap, renderer, map_scale);
-
+        geo::render(worldmap, renderer, add_to_mapscale);
+        add_to_mapscale = 0.f;
     //    SDL_SetRenderDrawColor(renderer, 0,255,255,255);
-geo::render(worldwater, renderer, map_scale);
+geo::render(worldwater, renderer);
         
     }
     
@@ -187,25 +189,30 @@ void Renderer::render_overlay() //gui
     {
         
 
-        ImGui::Begin("Map"); // Create a window called "Hello, world!" and append into it.
-        static int mobile = 0; //is_mobile();
-        ImGui::Text("io.WantTextInput=%d mobile=%d", io.WantTextInput, mobile);          // Display some text (you can use a format strings too)
+        ImGui::Begin("Imgui x SDL3 x WASM"); // Create a window called "Hello, world!" and append into it.
+        
+        ImGui::Text("io.WantTextInput=%d mobile=%d", io.WantTextInput, plat_mobile);          // Display some text (you can use a format strings too)
         ImGui::SameLine();
         ImGui::Checkbox("Demo", &show_demo_window); // Edit bools storing our window open/close state
+
+        ImGui::Text(event_str.c_str());
+
        
-
-        ImGui::SliderFloat("Map Scale", &map_scale, 0, 50);
-        static std::string agent = "dunno";
-        if(ImGui::Button("Get UserAgent")){
+        static std::string agent = std::string();
+        if(agent.empty()){
+            if(ImGui::Button("Get UserAgent")){
            
-            agent = get_user_agent();
-             LOGF("user agent = %s",agent.c_str());
-        }
+                agent = get_user_agent();
+                LOGF("user agent = %s",agent.c_str());
+            }
+        } 
+        else ImGui::TextWrapped("UserAgent: %s", agent.c_str());
+            
 
-        ImGui::TextWrapped("UserAgent: %s", agent.c_str());
         
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        if(ImGui::CollapsingHeader("Text Input Test")){
+        
+        ImGui::Text("avg. %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        if(ImGui::CollapsingHeader("Text Input")){
              static char text[1024 * 16] =
                 "\n"
                 " test text can you type on mobile!\n"

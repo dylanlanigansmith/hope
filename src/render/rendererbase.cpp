@@ -1,8 +1,12 @@
 #include "rendererbase.hpp"
+#include "web.hpp"
 
 bool RendererBase::mobile()
-{
+{    
+    return plat_mobile;
+}
 
-    
-    return false;
+void RendererBase::init_platform()
+{
+    plat_mobile = is_mobile();
 }
